@@ -20,7 +20,7 @@ VeriMind's target architecture combines three pillars into one modular Layer-1 (
 | Pillar | Description | Status |
 |---|---|---|
 | **ZK Proof of Inference** | Target architecture: every model forward pass accompanied by a Halo2/Plonky3 zero-knowledge proof, verified on-chain. | **PLANNED** — not implemented. The current prototype uses a TEST-ONLY `MockZKVerifier` that performs no cryptographic verification (see [`docs/security/zk-security.md`](docs/security/zk-security.md)). |
-| **Vector Attribution & Micro-Royalties** | Output embeddings are matched against indexed creator datasets via cosine similarity, routing royalty payments automatically. | Scoring algorithm implemented as an off-chain reference implementation (`attribution-engine/`); on-chain settlement implemented in `RoyaltyManager.sol`. |
+| **Vector Attribution & Micro-Royalties** | Output embeddings are matched against indexed creator datasets via cosine similarity, routing royalty payments automatically. | Off-chain attribution scoring is implemented as a reference engine (`attribution-engine/`); on-chain royalty settlement is implemented in `RoyaltyManager.sol`. |
 | **DePIN Compute Mesh** | Independent GPU/TPU operators stake collateral to join as Compute Nodes. | Staking/collateral logic implemented in `StakingManager.sol`; networked Compute Node software is PLANNED. |
 
 Full architecture, consensus model, and cryptographic specification: [`docs/VeriMind_Whitepaper_v2.0.pdf`](docs/VeriMind_Whitepaper_v2.0.pdf).
@@ -57,10 +57,10 @@ verimind-protocol/
 
 This project is in **early development**. What exists today:
 
-- [x] Full protocol architecture and specification (consensus, slashing, ZK circuit design, tokenomics)
+- [x] Protocol architecture and technical specification (consensus, slashing, ZK circuit design, tokenomics)
 - [x] Smart contract interfaces and core logic scaffolding (6 contracts), with Solidity test suites written in `test/` — **local compile/test execution (`npx hardhat compile` / `npx hardhat test`) is still pending in this repository; see Quickstart below**
 - [x] Working reference implementation of the vector attribution & royalty-scoring algorithm
-- [x] Isolated end-to-end demo of the currently implemented flow (see `demo/`) — uses a test-only mock ZK verifier, not real cryptographic proof
+- [x] Isolated end-to-end demo implementation of the currently implemented flow (see `demo/`) — uses a test-only mock ZK verifier, not real cryptographic proof
 - [ ] ZK circuit implementation (Halo2/Plonky3) — not started (see `docs/security/zk-security.md`)
 - [ ] On-chain token vesting/cliff enforcement — not started (see `docs/specs/tokenomics-spec.md`); current `VMINDToken` mints all allocations as immediately liquid
 - [ ] Cosmos SDK app-chain / consensus layer — not started (see `docs/specs/network-overview.md`)
@@ -109,3 +109,4 @@ Apache License 2.0 — see [`LICENSE`](LICENSE). This is a deliberate choice for
 
 - Technical Whitepaper: [`docs/VeriMind_Whitepaper_v2.0.pdf`](docs/VeriMind_Whitepaper_v2.0.pdf)
 - Investor/Business Overview: available on request (confidential, not part of this open-source repo)
+- 
