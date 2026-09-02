@@ -504,4 +504,4 @@ The current product strategy is:
 
 > "Validate attribution and programmable royalty infrastructure before building the full decentralized inference network."
 
-This allows the existing EVM-based MVP to demonstrate a focused product while preserving a clear technical path toward verifiable AI inference, decentralized compute, and the future VeriMind network architecture,rather than as a claim that the future decentralized inference network is already operational.
+This allows the existing EVM-based MVP to demonstrate a focused product while preserving a clear technical path toward verifiable AI inference, decentralized compute, and the future VeriMind network architecture, rather than as a claim that the future decentralized inference network is already operational.
