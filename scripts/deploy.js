@@ -15,6 +15,9 @@
  * - This deployment is for the current MVP/PoC architecture.
  * - MockZKVerifier is TEST-ONLY and provides no cryptographic security.
  * - Governance uses an explicit target allowlist.
+ * - RoyaltyManager.SETTLER_ROLE is granted to the deployer for local MVP/PoC
+ *   settlement, matching the isolated demo. Use a dedicated settlement
+ *   service/multisig before any production deployment.
  * - Real vesting, production ZK verification, validators, and L1/appchain
  *   infrastructure are future components.
  */
@@ -194,14 +197,24 @@ async function main() {
 
   console.log("\nWiring roles...");
 
+  // InferenceManager controls escrow releases/refunds.
   await escrow.grantRole(
     await escrow.CONTROLLER_ROLE(),
     await inference.getAddress()
   );
 
+  // InferenceManager can slash nodes after invalid proofs.
   await staking.grantRole(
     await staking.SLASHER_ROLE(),
     await inference.getAddress()
+  );
+
+  // MVP/PoC only:
+  // The deployer acts as the authorized royalty settlement caller,
+  // matching demo/run-demo.js.
+  await royalty.grantRole(
+    await royalty.SETTLER_ROLE(),
+    deployer.address
   );
 
   console.log(
@@ -210,6 +223,10 @@ async function main() {
 
   console.log(
     "  StakingManager.SLASHER_ROLE -> InferenceManager"
+  );
+
+  console.log(
+    "  RoyaltyManager.SETTLER_ROLE -> deployer (MVP/PoC only)"
   );
 
   // -------------------------------------------------------------------
@@ -232,25 +249,66 @@ async function main() {
   // -------------------------------------------------------------------
 
   console.log("\nDeployment complete.");
+
   console.log("\nContract addresses:");
-  console.log("VMINDToken:      ", await vmind.getAddress());
-  console.log("StakingManager:  ", await staking.getAddress());
-  console.log("EscrowVault:     ", await escrow.getAddress());
-  console.log("MockZKVerifier:  ", await mockVerifier.getAddress());
-  console.log("InferenceManager:", await inference.getAddress());
-  console.log("RoyaltyManager:  ", await royalty.getAddress());
-  console.log("Governance:      ", await governance.getAddress());
+
+  console.log(
+    "VMINDToken:      ",
+    await vmind.getAddress()
+  );
+
+  console.log(
+    "StakingManager:  ",
+    await staking.getAddress()
+  );
+
+  console.log(
+    "EscrowVault:     ",
+    await escrow.getAddress()
+  );
+
+  console.log(
+    "MockZKVerifier:  ",
+    await mockVerifier.getAddress()
+  );
+
+  console.log(
+    "InferenceManager:",
+    await inference.getAddress()
+  );
+
+  console.log(
+    "RoyaltyManager:  ",
+    await royalty.getAddress()
+  );
+
+  console.log(
+    "Governance:      ",
+    await governance.getAddress()
+  );
 
   console.log("\nMVP notes:");
+
   console.log(
     "- Attribution engine is currently off-chain/reference implementation."
   );
+
   console.log(
     "- Royalty settlement is implemented through RoyaltyManager."
   );
+
+  console.log(
+    "- For this local MVP/PoC, the deployer is the authorized royalty settler, matching demo/run-demo.js."
+  );
+
+  console.log(
+    "- Before production, replace deployer settlement with a dedicated settlement service/multisig and appropriate authorization controls."
+  );
+
   console.log(
     "- MockZKVerifier is TEST-ONLY."
   );
+
   console.log(
     "- Production ZK, decentralized compute, validators, and appchain/L1 are future components."
   );
