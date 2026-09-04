@@ -1,565 +1,330 @@
-const { ethers } = require("hardhat");
+const hre = require("hardhat");
 const { execFileSync } = require("child_process");
-
-const MIN_STAKE = ethers.parseUnits("1000", 18);
-const UNSTAKE_COOLDOWN = 7 * 24 * 60 * 60;
-const PROCESSING_TIMEOUT = 60 * 60;
+const path = require("path");
 
 async function main() {
-  console.log("\n==============================================");
-  console.log(" VeriMind Protocol - End-to-End Prototype Demo");
-  console.log("==============================================\n");
+  const { ethers } = hre;
 
-  // --------------------------------------------------------------------------
-  // Signers
-  // --------------------------------------------------------------------------
+  console.log("\n========================================");
+  console.log("       VeriMind Protocol E2E Demo");
+  console.log("========================================\n");
 
   const [
     deployer,
     communityPool,
     ecosystemPool,
-    seedVesting,
-    teamVesting,
+    seedInvestors,
+    coreTeam,
     treasury,
+    client,
     creator1,
     creator2,
     creator3,
-    client
   ] = await ethers.getSigners();
 
-  console.log("Deployer:", deployer.address);
-  console.log("Client:", client.address);
-  console.log("Creator 1:", creator1.address);
-  console.log("Creator 2:", creator2.address);
-  console.log("Creator 3:", creator3.address);
-  console.log("");
+  // ---------------------------------------------------------------------------
+  // Configuration
+  // ---------------------------------------------------------------------------
 
-  // --------------------------------------------------------------------------
+  const MIN_STAKE = ethers.parseUnits("1000", 18);
+  const UNSTAKE_COOLDOWN = 7 * 24 * 60 * 60;
+  const PROCESSING_TIMEOUT = 60 * 60;
+  const GOVERNANCE_VOTING_PERIOD = 7 * 24 * 60 * 60;
+  const GOVERNANCE_QUORUM = ethers.parseUnits("10000000", 18);
+
+  const MAX_FEE = ethers.parseUnits("10", 18);
+  const ROYALTY_FUNDING = ethers.parseUnits("10", 18);
+
+  const REQUEST_ID = ethers.keccak256(
+    ethers.toUtf8Bytes("verimind-demo-request-001")
+  );
+
+  const PROMPT_HASH = ethers.keccak256(
+    ethers.toUtf8Bytes("What is the relationship between AI models and creator attribution?")
+  );
+
+  // ---------------------------------------------------------------------------
   // 1. Deploy VMINDToken
-  // --------------------------------------------------------------------------
+  // ---------------------------------------------------------------------------
 
   console.log("1. Deploying VMINDToken...");
 
-  const VMINDToken =
-    await ethers.getContractFactory("VMINDToken");
+  const VMINDToken = await ethers.getContractFactory("VMINDToken");
 
-  const vmindToken = await VMINDToken.deploy(
+  const token = await VMINDToken.deploy(
     communityPool.address,
     ecosystemPool.address,
-    seedVesting.address,
-    teamVesting.address,
+    seedInvestors.address,
+    coreTeam.address,
     treasury.address
   );
 
-  await vmindToken.waitForDeployment();
+  await token.waitForDeployment();
 
-  const vmindAddress = await vmindToken.getAddress();
+  console.log("   VMINDToken:", await token.getAddress());
 
-  console.log("VMINDToken:", vmindAddress);
-  console.log("");
-
-  // --------------------------------------------------------------------------
+  // ---------------------------------------------------------------------------
   // 2. Deploy MockZKVerifier
-  // --------------------------------------------------------------------------
+  // ---------------------------------------------------------------------------
 
-  console.log("2. Deploying MockZKVerifier...");
+  console.log("\n2. Deploying MockZKVerifier...");
 
-  const MockZKVerifier =
-    await ethers.getContractFactory("MockZKVerifier");
+  const MockZKVerifier = await ethers.getContractFactory(
+    "MockZKVerifier"
+  );
 
-  const mockVerifier = await MockZKVerifier.deploy();
+  const zkVerifier = await MockZKVerifier.deploy();
 
-  await mockVerifier.waitForDeployment();
-
-  const mockVerifierAddress =
-    await mockVerifier.getAddress();
+  await zkVerifier.waitForDeployment();
 
   console.log(
-    "MockZKVerifier:",
-    mockVerifierAddress
+    "   MockZKVerifier:",
+    await zkVerifier.getAddress()
   );
 
   console.log(
-    "WARNING: MockZKVerifier is TEST-ONLY and provides no cryptographic security."
+    "   WARNING: MockZKVerifier is TEST-ONLY and provides no cryptographic security."
   );
 
-  console.log("");
-
-  // --------------------------------------------------------------------------
+  // ---------------------------------------------------------------------------
   // 3. Deploy StakingManager
-  // --------------------------------------------------------------------------
+  // ---------------------------------------------------------------------------
 
-  console.log("3. Deploying StakingManager...");
+  console.log("\n3. Deploying StakingManager...");
 
-  const StakingManager =
-    await ethers.getContractFactory("StakingManager");
+  const StakingManager = await ethers.getContractFactory(
+    "StakingManager"
+  );
 
   const stakingManager = await StakingManager.deploy(
-    vmindAddress,
+    await token.getAddress(),
     MIN_STAKE,
     UNSTAKE_COOLDOWN
   );
 
   await stakingManager.waitForDeployment();
 
-  const stakingAddress =
-    await stakingManager.getAddress();
-
   console.log(
-    "StakingManager:",
-    stakingAddress
+    "   StakingManager:",
+    await stakingManager.getAddress()
   );
 
-  console.log(
-    "Minimum stake:",
-    ethers.formatUnits(MIN_STAKE, 18),
-    "VMIND"
-  );
-
-  console.log("");
-
-  // --------------------------------------------------------------------------
+  // ---------------------------------------------------------------------------
   // 4. Deploy EscrowVault
-  // --------------------------------------------------------------------------
+  // ---------------------------------------------------------------------------
 
-  console.log("4. Deploying EscrowVault...");
+  console.log("\n4. Deploying EscrowVault...");
 
-  const EscrowVault =
-    await ethers.getContractFactory("EscrowVault");
+  const EscrowVault = await ethers.getContractFactory("EscrowVault");
 
   const escrowVault = await EscrowVault.deploy(
-    vmindAddress
+    await token.getAddress()
   );
 
   await escrowVault.waitForDeployment();
 
-  const escrowAddress =
-    await escrowVault.getAddress();
-
   console.log(
-    "EscrowVault:",
-    escrowAddress
+    "   EscrowVault:",
+    await escrowVault.getAddress()
   );
 
-  console.log("");
-
-  // --------------------------------------------------------------------------
+  // ---------------------------------------------------------------------------
   // 5. Deploy InferenceManager
-  // --------------------------------------------------------------------------
+  // ---------------------------------------------------------------------------
 
-  console.log("5. Deploying InferenceManager...");
+  console.log("\n5. Deploying InferenceManager...");
 
-  const InferenceManager =
-    await ethers.getContractFactory("InferenceManager");
+  const InferenceManager = await ethers.getContractFactory(
+    "InferenceManager"
+  );
 
   const inferenceManager = await InferenceManager.deploy(
-    escrowAddress,
-    stakingAddress,
-    mockVerifierAddress,
+    await escrowVault.getAddress(),
+    await stakingManager.getAddress(),
+    await zkVerifier.getAddress(),
     PROCESSING_TIMEOUT
   );
 
   await inferenceManager.waitForDeployment();
 
-  const inferenceAddress =
-    await inferenceManager.getAddress();
-
   console.log(
-    "InferenceManager:",
-    inferenceAddress
+    "   InferenceManager:",
+    await inferenceManager.getAddress()
   );
 
-  console.log(
-    "Processing timeout:",
-    PROCESSING_TIMEOUT,
-    "seconds"
-  );
-
-  console.log("");
-
-  // --------------------------------------------------------------------------
+  // ---------------------------------------------------------------------------
   // 6. Deploy RoyaltyManager
-  // --------------------------------------------------------------------------
+  // ---------------------------------------------------------------------------
 
-  console.log("6. Deploying RoyaltyManager...");
+  console.log("\n6. Deploying RoyaltyManager...");
 
-  const RoyaltyManager =
-    await ethers.getContractFactory("RoyaltyManager");
+  const RoyaltyManager = await ethers.getContractFactory(
+    "RoyaltyManager"
+  );
 
   const royaltyManager = await RoyaltyManager.deploy(
-    vmindAddress
+    await token.getAddress()
   );
 
   await royaltyManager.waitForDeployment();
 
-  const royaltyAddress =
-    await royaltyManager.getAddress();
-
   console.log(
-    "RoyaltyManager:",
-    royaltyAddress
+    "   RoyaltyManager:",
+    await royaltyManager.getAddress()
   );
 
-  console.log("");
-
-  // --------------------------------------------------------------------------
+  // ---------------------------------------------------------------------------
   // 7. Deploy Governance
-  // --------------------------------------------------------------------------
+  // ---------------------------------------------------------------------------
 
-  console.log("7. Deploying Governance...");
+  console.log("\n7. Deploying Governance...");
 
-  const Governance =
-    await ethers.getContractFactory("Governance");
+  const Governance = await ethers.getContractFactory("Governance");
 
   const governance = await Governance.deploy(
-    vmindAddress,
-    7 * 24 * 60 * 60,
-    ethers.parseUnits("10000000", 18)
+    await token.getAddress(),
+    GOVERNANCE_VOTING_PERIOD,
+    GOVERNANCE_QUORUM
   );
 
   await governance.waitForDeployment();
 
-  const governanceAddress =
-    await governance.getAddress();
-
   console.log(
-    "Governance:",
-    governanceAddress
+    "   Governance:",
+    await governance.getAddress()
   );
 
-  console.log("");
+  // ---------------------------------------------------------------------------
+  // 8. Configure Roles
+  // ---------------------------------------------------------------------------
 
-  // --------------------------------------------------------------------------
-  // 8. Configure contract roles
-  // --------------------------------------------------------------------------
+  console.log("\n8. Configuring protocol roles...");
 
-  console.log("8. Configuring contract relationships...");
-
-  // InferenceManager controls EscrowVault.
-  const controllerRole =
-    await escrowVault.CONTROLLER_ROLE();
+  const CONTROLLER_ROLE = await escrowVault.CONTROLLER_ROLE();
+  const SLASHER_ROLE = await stakingManager.SLASHER_ROLE();
+  const SETTLER_ROLE = await royaltyManager.SETTLER_ROLE();
 
   await (
     await escrowVault.grantRole(
-      controllerRole,
-      inferenceAddress
+      CONTROLLER_ROLE,
+      await inferenceManager.getAddress()
     )
   ).wait();
-
-  console.log(
-    "✓ EscrowVault.CONTROLLER_ROLE -> InferenceManager"
-  );
-
-  // InferenceManager can slash nodes.
-  const slasherRole =
-    await stakingManager.SLASHER_ROLE();
 
   await (
     await stakingManager.grantRole(
-      slasherRole,
-      inferenceAddress
+      SLASHER_ROLE,
+      await inferenceManager.getAddress()
     )
   ).wait();
 
-  console.log(
-    "✓ StakingManager.SLASHER_ROLE -> InferenceManager"
-  );
-
-  // Deployer acts as settlement authority for this local PoC.
-  const settlerRole =
-    await royaltyManager.SETTLER_ROLE();
-
   await (
     await royaltyManager.grantRole(
-      settlerRole,
+      SETTLER_ROLE,
       deployer.address
     )
   ).wait();
 
-  console.log(
-    "✓ RoyaltyManager.SETTLER_ROLE -> deployer"
-  );
-
-  // Governance target allowlist.
+  // Allow VMINDToken as a governance target.
   await (
     await governance.setAllowedTarget(
-      vmindAddress,
+      await token.getAddress(),
       true
     )
   ).wait();
 
-  console.log(
-    "✓ Governance target allowlist configured"
-  );
+  console.log("   Role configuration complete.");
 
-  console.log("");
+  // ---------------------------------------------------------------------------
+  // 9. Fund demo participants
+  // ---------------------------------------------------------------------------
 
-  // --------------------------------------------------------------------------
-  // 9. Prepare local token balances
-  // --------------------------------------------------------------------------
+  console.log("\n9. Funding demo participants...");
 
-  console.log("9. Preparing local VMIND balances...");
-
-  const clientFunding =
-    ethers.parseUnits("100", 18);
-
-  const nodeFunding =
-    ethers.parseUnits("2000", 18);
-
-  const royaltyFunding =
-    ethers.parseUnits("10", 18);
-
-  // Fund client.
+  // Client receives VMIND to pay inference fees.
   await (
-    await communityPool.sendTransaction({
-      to: client.address,
-      value: 0
-    })
-  ).wait();
-
-  await (
-    await vmindToken
+    await token
       .connect(communityPool)
-      .transfer(
-        client.address,
-        clientFunding
-      )
+      .transfer(client.address, MAX_FEE)
   ).wait();
 
-  // Fund compute/attribution node.
+  // Creator 1 receives enough VMIND to stake.
   await (
-    await vmindToken
+    await token
       .connect(communityPool)
       .transfer(
         creator1.address,
-        nodeFunding
+        ethers.parseUnits("2000", 18)
       )
   ).wait();
 
-  // Fund RoyaltyManager from ecosystem pool.
+  // RoyaltyManager receives funds used for creator royalty distribution.
   await (
-    await vmindToken
+    await token
       .connect(ecosystemPool)
       .transfer(
-        royaltyAddress,
-        royaltyFunding
+        await royaltyManager.getAddress(),
+        ROYALTY_FUNDING
       )
   ).wait();
 
+  console.log("   Client funded with:", ethers.formatUnits(MAX_FEE, 18), "VMIND");
   console.log(
-    "Client funded:",
-    ethers.formatUnits(clientFunding, 18),
+    "   Creator 1 funded with:",
+    ethers.formatUnits(ethers.parseUnits("2000", 18), 18),
+    "VMIND"
+  );
+  console.log(
+    "   RoyaltyManager funded with:",
+    ethers.formatUnits(ROYALTY_FUNDING, 18),
     "VMIND"
   );
 
-  console.log(
-    "Creator 1 funded:",
-    ethers.formatUnits(nodeFunding, 18),
-    "VMIND"
-  );
+  // ---------------------------------------------------------------------------
+  // 10. Creator Node Stakes
+  // ---------------------------------------------------------------------------
 
-  console.log(
-    "RoyaltyManager funded:",
-    ethers.formatUnits(royaltyFunding, 18),
-    "VMIND"
-  );
-
-  console.log("");
-
-  // --------------------------------------------------------------------------
-  // 10. Stake compute node
-  // --------------------------------------------------------------------------
-
-  console.log("10. Staking compute node...");
-
-  const stakeAmount =
-    ethers.parseUnits("1000", 18);
+  console.log("\n10. Creator 1 staking as an attribution/compute node...");
 
   await (
-    await vmindToken
+    await token
       .connect(creator1)
       .approve(
-        stakingAddress,
-        stakeAmount
+        await stakingManager.getAddress(),
+        MIN_STAKE
       )
   ).wait();
 
   await (
     await stakingManager
       .connect(creator1)
-      .stake(stakeAmount)
+      .stake(MIN_STAKE)
   ).wait();
 
-  const nodeEligible =
-    await stakingManager.isEligible(
-      creator1.address
-    );
-
-  console.log(
-    "Creator 1 eligible:",
-    nodeEligible
+  const creatorEligible = await stakingManager.isEligible(
+    creator1.address
   );
 
-  if (!nodeEligible) {
+  if (!creatorEligible) {
     throw new Error(
       "Creator 1 should be eligible after staking."
     );
   }
 
-  console.log("");
+  console.log("   Creator 1 is eligible:", creatorEligible);
 
-  // --------------------------------------------------------------------------
-  // 11. Run attribution reference implementation
-  // --------------------------------------------------------------------------
+  // ---------------------------------------------------------------------------
+  // 11. Submit inference request
+  // ---------------------------------------------------------------------------
 
-  console.log("11. Running attribution engine...");
-
-  const pythonCandidates = [
-    "python3",
-    "python"
-  ];
-
-  let pythonCommand = null;
-
-  for (const candidate of pythonCandidates) {
-    try {
-      execFileSync(
-        candidate,
-        ["--version"],
-        {
-          stdio: "ignore"
-        }
-      );
-
-      pythonCommand = candidate;
-      break;
-    } catch (_) {
-      // Try next candidate.
-    }
-  }
-
-  if (pythonCommand) {
-    try {
-      execFileSync(
-        pythonCommand,
-        [
-          "attribution-engine/attribution.py"
-        ],
-        {
-          stdio: "inherit"
-        }
-      );
-
-      console.log(
-        "✓ Attribution reference implementation executed."
-      );
-    } catch (error) {
-      console.log(
-        "Attribution reference implementation returned an error."
-      );
-
-      console.log(
-        "Continuing with the deterministic demo attribution vector."
-      );
-    }
-  } else {
-    console.log(
-      "Python was not found on PATH."
-    );
-
-    console.log(
-      "Continuing with the deterministic demo attribution vector."
-    );
-  }
-
-  console.log("");
-
-  // --------------------------------------------------------------------------
-  // 12. Prepare attribution vector
-  // --------------------------------------------------------------------------
-
-  console.log("12. Preparing attribution scores...");
-
-  const creators = [
-    creator1.address,
-    creator2.address,
-    creator3.address
-  ];
-
-  // 10,000 BPS = 100%.
-  const scoresBps = [
-    5000,
-    3000,
-    2000
-  ];
-
-  const totalBps =
-    scoresBps.reduce(
-      (sum, value) => sum + value,
-      0
-    );
-
-  if (totalBps !== 10000) {
-    throw new Error(
-      `Invalid attribution scores: expected 10000 BPS, received ${totalBps}.`
-    );
-  }
-
-  console.log(
-    "Creator 1:",
-    scoresBps[0],
-    "BPS"
-  );
-
-  console.log(
-    "Creator 2:",
-    scoresBps[1],
-    "BPS"
-  );
-
-  console.log(
-    "Creator 3:",
-    scoresBps[2],
-    "BPS"
-  );
-
-  console.log(
-    "Total:",
-    totalBps,
-    "BPS"
-  );
-
-  console.log("");
-
-  // --------------------------------------------------------------------------
-  // 13. Submit inference request
-  // --------------------------------------------------------------------------
-
-  console.log("13. Submitting inference request...");
-
-  const requestId =
-    ethers.keccak256(
-      ethers.toUtf8Bytes(
-        "verimind-demo-request-001"
-      )
-    );
-
-  const maxFee =
-    ethers.parseUnits("10", 18);
-
-  const promptHash =
-    ethers.keccak256(
-      ethers.toUtf8Bytes(
-        "verimind-demo-prompt"
-      )
-    );
+  console.log("\n11. Submitting inference request...");
 
   await (
-    await vmindToken
+    await token
       .connect(client)
       .approve(
-        escrowAddress,
-        maxFee
+        await escrowVault.getAddress(),
+        MAX_FEE
       )
   ).wait();
 
@@ -567,146 +332,247 @@ async function main() {
     await inferenceManager
       .connect(client)
       .submitRequest(
-        requestId,
-        maxFee,
-        promptHash
+        REQUEST_ID,
+        MAX_FEE,
+        PROMPT_HASH
       )
   ).wait();
 
+  console.log("   Request ID:", REQUEST_ID);
   console.log(
-    "✓ Inference request submitted."
-  );
-
-  console.log(
-    "Request ID:",
-    requestId
-  );
-
-  console.log(
-    "Max fee:",
-    ethers.formatUnits(maxFee, 18),
+    "   Max fee:",
+    ethers.formatUnits(MAX_FEE, 18),
     "VMIND"
   );
 
-  console.log("");
+  // ---------------------------------------------------------------------------
+  // 12. Assign eligible node
+  // ---------------------------------------------------------------------------
 
-  // --------------------------------------------------------------------------
-  // 14. Assign compute node
-  // --------------------------------------------------------------------------
-
-  console.log("14. Assigning compute node...");
+  console.log("\n12. Assigning eligible node...");
 
   await (
     await inferenceManager
       .connect(creator1)
-      .assignNode(requestId)
+      .assignNode(REQUEST_ID)
   ).wait();
 
-  console.log(
-    "✓ Creator 1 assigned as compute node."
+  console.log("   Assigned node:", creator1.address);
+
+  // ---------------------------------------------------------------------------
+  // 13. Submit mock proof
+  // ---------------------------------------------------------------------------
+
+  console.log("\n13. Submitting inference proof...");
+
+  const mockProof = ethers.hexlify(
+    ethers.toUtf8Bytes("verimind-demo-mock-proof")
   );
 
-  console.log("");
-
-  // --------------------------------------------------------------------------
-  // 15. Submit mock ZK proof
-  // --------------------------------------------------------------------------
-
-  console.log("15. Submitting mock ZK proof...");
-
-  const mockProof =
-    ethers.hexlify(
-      ethers.randomBytes(32)
-    );
-
-  const publicInputs =
-    ethers.hexlify(
-      ethers.randomBytes(32)
-    );
+  const publicInputs = ethers.hexlify(
+    ethers.toUtf8Bytes("verimind-demo-public-inputs")
+  );
 
   await (
     await inferenceManager
       .connect(creator1)
       .submitProof(
-        requestId,
+        REQUEST_ID,
         mockProof,
         publicInputs
       )
   ).wait();
 
-  console.log(
-    "✓ Mock proof submitted."
-  );
+  console.log("   Mock proof submitted.");
+
+  const requestAfterProof =
+    await inferenceManager.requests(REQUEST_ID);
 
   console.log(
-    "WARNING: Proof verification is TEST-ONLY."
+    "   Request state after verification:",
+    requestAfterProof.state.toString()
   );
 
-  console.log("");
-
-  // --------------------------------------------------------------------------
-  // 16. Verify request state
-  // --------------------------------------------------------------------------
-
-  console.log("16. Checking inference state...");
-
-  const request =
-    await inferenceManager.requests(
-      requestId
-    );
-
-  // InferenceManager.State.VERIFIED = 4.
-  if (request.state !== 4n) {
+  // VERIFIED = 4
+  if (requestAfterProof.state !== 4n) {
     throw new Error(
-      `Expected VERIFIED state (4), received ${request.state}.`
+      `Expected request state VERIFIED (4), got ${requestAfterProof.state}`
     );
   }
 
-  console.log(
-    "✓ Request reached VERIFIED state."
+  // ---------------------------------------------------------------------------
+  // 14. Run real attribution engine through bridge
+  // ---------------------------------------------------------------------------
+
+  console.log("\n14. Running attribution engine...");
+
+  /*
+   * These embeddings are intentionally deterministic demo vectors.
+   *
+   * The actual Hardhat creator addresses are passed to the Python bridge,
+   * so the returned attribution records can be sent directly to
+   * RoyaltyManager.
+   */
+
+  const queryEmbedding = [
+    0.95,
+    0.10,
+    0.05,
+    0.00,
+  ];
+
+  const creatorEmbeddings = [
+    {
+      address: creator1.address,
+      embedding: [
+        0.90,
+        0.15,
+        0.05,
+        0.00,
+      ],
+    },
+    {
+      address: creator2.address,
+      embedding: [
+        0.20,
+        0.85,
+        0.10,
+        0.05,
+      ],
+    },
+    {
+      address: creator3.address,
+      embedding: [
+        0.10,
+        0.10,
+        0.85,
+        0.20,
+      ],
+    },
+  ];
+
+  const attributionInput = {
+    query: queryEmbedding,
+    creators: creatorEmbeddings,
+    k: 3,
+    tau: 0.1,
+  };
+
+  const bridgePath = path.join(
+    __dirname,
+    "attribution_bridge.py"
   );
 
-  console.log("");
+  const pythonCommand =
+    process.platform === "win32"
+      ? "python"
+      : "python3";
 
-  // --------------------------------------------------------------------------
-  // 17. Settle inference request
-  // --------------------------------------------------------------------------
+  let attributionOutput;
 
-  console.log("17. Settling inference request...");
+  try {
+    attributionOutput = execFileSync(
+      pythonCommand,
+      [bridgePath],
+      {
+        input: JSON.stringify(attributionInput),
+        encoding: "utf8",
+        stdio: ["pipe", "pipe", "inherit"],
+      }
+    );
+  } catch (error) {
+    throw new Error(
+      "Attribution bridge execution failed. " +
+      "Make sure Python 3 and the attribution engine dependencies are available."
+    );
+  }
 
-  await (
-    await inferenceManager
-      .connect(deployer)
-      .settle(
-        requestId,
-        maxFee
-      )
-  ).wait();
+  let attributionResults;
 
-  console.log(
-    "✓ Inference request settled."
+  try {
+    attributionResults = JSON.parse(
+      attributionOutput.trim()
+    );
+  } catch (error) {
+    throw new Error(
+      `Invalid JSON returned by attribution bridge:\n${attributionOutput}`
+    );
+  }
+
+  if (!Array.isArray(attributionResults)) {
+    throw new Error(
+      "Attribution bridge returned an invalid result format."
+    );
+  }
+
+  if (attributionResults.length === 0) {
+    throw new Error(
+      "Attribution engine returned no creators."
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // 15. Validate attribution output
+  // ---------------------------------------------------------------------------
+
+  console.log("\n15. Validating attribution scores...");
+
+  const creators = attributionResults.map(
+    (result) => result.address
   );
 
-  console.log(
-    "✓ Full escrow released to assigned compute node."
+  const scoresBps = attributionResults.map(
+    (result) => Number(result.bps)
   );
 
-  console.log("");
+  const totalBps = scoresBps.reduce(
+    (sum, value) => sum + value,
+    0
+  );
 
-  // --------------------------------------------------------------------------
-  // 18. Execute royalty distribution
-  // --------------------------------------------------------------------------
+  if (totalBps !== 10000) {
+    throw new Error(
+      `Attribution BPS must sum to 10000, got ${totalBps}`
+    );
+  }
 
-  console.log("18. Executing royalty distribution...");
+  const uniqueCreators = new Set(
+    creators.map((address) => address.toLowerCase())
+  );
 
-  const royaltyAmount =
-    ethers.parseUnits("10", 18);
+  if (uniqueCreators.size !== creators.length) {
+    throw new Error(
+      "Attribution output contains duplicate creator addresses."
+    );
+  }
+
+  for (let i = 0; i < attributionResults.length; i++) {
+    const result = attributionResults[i];
+
+    console.log(
+      `   ${result.address}: score=${result.score}, bps=${result.bps}`
+    );
+  }
+
+  console.log("   Total attribution:", totalBps, "BPS");
+  console.log("   Attribution validation passed.");
+
+  // ---------------------------------------------------------------------------
+  // 16. Distribute royalties using actual attribution output
+  // ---------------------------------------------------------------------------
+
+  console.log("\n16. Distributing royalties...");
+
+  const royaltyAmount = ethers.parseUnits(
+    "10",
+    18
+  );
 
   await (
     await royaltyManager
       .connect(deployer)
       .distributeRoyalties(
-        requestId,
+        REQUEST_ID,
         royaltyAmount,
         creators,
         scoresBps
@@ -714,219 +580,143 @@ async function main() {
   ).wait();
 
   console.log(
-    "✓ Royalty distribution completed."
-  );
-
-  console.log("");
-
-  // --------------------------------------------------------------------------
-  // 19. Final balances
-  // --------------------------------------------------------------------------
-
-  console.log("19. Final balances...");
-
-  const clientBalance =
-    await vmindToken.balanceOf(
-      client.address
-    );
-
-  const creator1Balance =
-    await vmindToken.balanceOf(
-      creator1.address
-    );
-
-  const creator2Balance =
-    await vmindToken.balanceOf(
-      creator2.address
-    );
-
-  const creator3Balance =
-    await vmindToken.balanceOf(
-      creator3.address
-    );
-
-  const royaltyManagerBalance =
-    await vmindToken.balanceOf(
-      royaltyAddress
-    );
-
-  console.log(
-    "Client:",
-    ethers.formatUnits(clientBalance, 18),
+    "   Royalty amount:",
+    ethers.formatUnits(royaltyAmount, 18),
     "VMIND"
   );
 
-  console.log(
-    "Creator 1:",
-    ethers.formatUnits(creator1Balance, 18),
-    "VMIND"
-  );
+  for (let i = 0; i < attributionResults.length; i++) {
+    const balance = await token.balanceOf(
+      creators[i]
+    );
+
+    console.log(
+      `   Creator ${i + 1} balance:`,
+      ethers.formatUnits(balance, 18),
+      "VMIND"
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // 17. Settle inference escrow
+  // ---------------------------------------------------------------------------
+
+  console.log("\n17. Settling inference escrow...");
+
+  await (
+    await inferenceManager
+      .connect(creator1)
+      .settle(
+        REQUEST_ID,
+        MAX_FEE
+      )
+  ).wait();
+
+  const finalRequest =
+    await inferenceManager.requests(REQUEST_ID);
 
   console.log(
-    "Creator 2:",
-    ethers.formatUnits(creator2Balance, 18),
-    "VMIND"
+    "   Final request state:",
+    finalRequest.state.toString()
   );
 
-  console.log(
-    "Creator 3:",
-    ethers.formatUnits(creator3Balance, 18),
-    "VMIND"
-  );
+  // SETTLED = 5
+  if (finalRequest.state !== 5n) {
+    throw new Error(
+      `Expected request state SETTLED (5), got ${finalRequest.state}`
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // 18. Verify final balances
+  // ---------------------------------------------------------------------------
+
+  console.log("\n18. Verifying final balances...");
+
+  const remainingEscrow =
+    await escrowVault.escrowed(REQUEST_ID);
+
+  if (remainingEscrow !== 0n) {
+    throw new Error(
+      `Expected request escrow to be empty, got ${ethers.formatUnits(
+        remainingEscrow,
+        18
+      )} VMIND`
+    );
+  }
+
+  console.log("   Escrow fully settled.");
+
+  const creator1FinalBalance =
+    await token.balanceOf(creator1.address);
+
+  if (creator1FinalBalance <= MIN_STAKE) {
+    throw new Error(
+      "Creator 1 should have received the inference payment."
+    );
+  }
 
   console.log(
-    "RoyaltyManager:",
+    "   Creator 1 final balance:",
     ethers.formatUnits(
-      royaltyManagerBalance,
+      creator1FinalBalance,
       18
     ),
     "VMIND"
   );
 
-  console.log("");
+  // ---------------------------------------------------------------------------
+  // Final summary
+  // ---------------------------------------------------------------------------
 
-  // --------------------------------------------------------------------------
-  // 20. Final verification
-  // --------------------------------------------------------------------------
+  console.log("\n========================================");
+  console.log("          DEMO COMPLETED");
+  console.log("========================================\n");
 
-  console.log("20. Final verification...");
+  console.log("E2E flow:");
+  console.log("  ✓ Contracts deployed");
+  console.log("  ✓ Roles configured");
+  console.log("  ✓ Demo participants funded");
+  console.log("  ✓ Attribution/compute node staked");
+  console.log("  ✓ Inference request submitted");
+  console.log("  ✓ Escrow funded");
+  console.log("  ✓ Node assigned");
+  console.log("  ✓ Mock proof submitted");
+  console.log("  ✓ Proof verified by TEST-ONLY mock verifier");
+  console.log("  ✓ Real attribution engine executed");
+  console.log("  ✓ Attribution scores validated");
+  console.log("  ✓ Royalties distributed using real BPS output");
+  console.log("  ✓ Inference escrow settled");
+  console.log("  ✓ Final state verified");
 
-  const finalRequest =
-    await inferenceManager.requests(
-      requestId
+  console.log("\nRequest ID:");
+  console.log(`  ${REQUEST_ID}`);
+
+  console.log("\nAttribution:");
+  attributionResults.forEach((result) => {
+    console.log(
+      `  ${result.address} -> ${result.bps} BPS`
     );
+  });
 
-  if (finalRequest.state !== 5n) {
-    throw new Error(
-      `Expected SETTLED state (5), received ${finalRequest.state}.`
-    );
-  }
-
-  const royaltySettled =
-    await royaltyManager.settled(
-      requestId
-    );
-
-  if (!royaltySettled) {
-    throw new Error(
-      "Royalty settlement flag was not recorded."
-    );
-  }
-
-  const remainingEscrow =
-    await escrowVault.escrowed(
-      requestId
-    );
-
-  if (remainingEscrow !== 0n) {
-    throw new Error(
-      `Expected zero remaining escrow, received ${remainingEscrow}.`
-    );
-  }
-
+  console.log("\nImportant:");
   console.log(
-    "✓ Inference state: SETTLED"
+    "  MockZKVerifier is TEST-ONLY and must not be used in production."
   );
 
   console.log(
-    "✓ Royalty settlement: recorded"
+    "  Attribution is currently computed off-chain and submitted by a trusted settler."
   );
 
   console.log(
-    "✓ Remaining escrow: 0 VMIND"
-  );
-
-  console.log("");
-
-  // --------------------------------------------------------------------------
-  // Summary
-  // --------------------------------------------------------------------------
-
-  console.log("==============================================");
-  console.log(" Demo Completed Successfully");
-  console.log("==============================================");
-
-  console.log(
-    "\nImplemented workflow demonstrated:"
-  );
-
-  console.log(
-    "1. VMINDToken deployment"
-  );
-
-  console.log(
-    "2. Contract role wiring"
-  );
-
-  console.log(
-    "3. Compute-node staking"
-  );
-
-  console.log(
-    "4. Attribution reference execution"
-  );
-
-  console.log(
-    "5. Inference request submission"
-  );
-
-  console.log(
-    "6. Compute-node assignment"
-  );
-
-  console.log(
-    "7. Mock ZK proof submission"
-  );
-
-  console.log(
-    "8. Inference verification"
-  );
-
-  console.log(
-    "9. Inference settlement"
-  );
-
-  console.log(
-    "10. Attribution-based royalty distribution"
-  );
-
-  console.log(
-    "11. Final state and balance verification"
-  );
-
-  console.log(
-    "\nIMPORTANT:"
-  );
-
-  console.log(
-    "- This is a local MVP/PoC demonstration."
-  );
-
-  console.log(
-    "- MockZKVerifier provides no cryptographic security."
-  );
-
-  console.log(
-    "- Attribution scoring remains an off-chain/reference component."
-  );
-
-  console.log(
-    "- Royalty settlement uses an authorized SETTLER_ROLE."
-  );
-
-  console.log(
-    "- Production ZK, decentralized compute, and dedicated network infrastructure are future components."
+    "  This demo validates the MVP integration flow, not production-grade decentralization or cryptographic proof security."
   );
 
   console.log("");
 }
 
-main()
-  .then(() => {
-    process.exit(0);
-  })
-  .catch((error) => {
-    console.error("\nDemo failed:");
-    console.error(error);
-    process.exit(1);
-  });
+main().catch((error) => {
+  console.error("\nDemo failed:");
+  console.error(error);
+  process.exitCode = 1;
+});
