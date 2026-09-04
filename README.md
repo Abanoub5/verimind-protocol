@@ -92,7 +92,7 @@ The repository contains an isolated demonstration connecting the implemented com
 demo/
 ```
 
-The demo covers the currently implemented flow from escrow and inference lifecycle through attribution and royalty settlement.
+The demo illustrates the currently implemented attribution-to-royalty settlement workflow. The inference, escrow, staking, and mock ZK components are prototype/future-oriented primitives and are not required for the current MVP.
 
 The ZK component used in this demonstration is a test-only mock verifier and does not represent production cryptographic proof verification.
 
