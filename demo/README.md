@@ -17,7 +17,7 @@ A runnable script (`run-demo.js`) that, against a local Hardhat in-memory EVM:
 - **Not a real chain.** Everything runs on Hardhat's ephemeral in-memory EVM. No Cosmos SDK app-chain, testnet, or mainnet. See `../docs/future/network-overview.md`.
 - **Not a real vector database.** The three "creators" and their embeddings in `run-demo.js` are a small hardcoded illustrative dataset, not a queryable index over real content. See `../docs/mvp/attribution-node-spec.md`.
 - **Not an automated Attribution Node.** The demo grants `RoyaltyManager.SETTLER_ROLE` directly to the deployer account and calls `distributeRoyalties()` manually. There is no networked, staked, consensus-checked node submitting this automatically. See `../docs/architecture/protocol-flow.md` §3.
-- **Not vesting-aware.** Token transfers in this demo use plain `VMINDToken` balances with no cliff/lock, consistent with the current contract's actual non-vesting behavior. See `../docs/Future/tokenomics-spec.md`.
+- **Not vesting-aware.** Token transfers in this demo use plain `VMINDToken` balances with no cliff/lock, consistent with the current contract's actual non-vesting behavior. See `../docs/future/tokenomics-spec.md`.
 
 ## Running the demo
 
