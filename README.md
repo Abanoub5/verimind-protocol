@@ -6,7 +6,7 @@ VeriMind is an early-stage infrastructure project for attributing AI-generated o
 
 The current MVP focuses on the attribution and royalty layer, designed to operate on an existing EVM-compatible blockchain rather than requiring a new Layer-1 network.
 
-> Technical Specification v2.0 · August 2026 · Founder: AbanoubRajaey
+> Technical Specification v2.1 · August 2026 · Founder: AbanoubRajaey
 
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 [![Status](https://img.shields.io/badge/status-early--development-orange.svg)]()
@@ -377,5 +377,5 @@ This project uses a permissive open-source license intended to support ecosystem
 
 ## Links
 
-- Technical Whitepaper: [`docs/VeriMind_Whitepaper_v2.0.pdf`](docs/VeriMind_Whitepaper_v2.0.pdf)
+- Technical Whitepaper: [`docs/VeriMind_Whitepaper_v2.1.pdf`](docs/VeriMind_Whitepaper_v2.1.pdf)
 - Investor / Business Overview: Available on request
