@@ -360,7 +360,7 @@ describe("VeriMind Protocol — additional coverage", function () {
 
       await expect(
         inference.settle(id, maxFee - 1n)
-      ).to.be.revertedWith("payment must equal max Fee");
+      ).to.be.revertedWith("payment must equal max fee");
     });
 
     it("reverts failOnTimeout() before the timeout has elapsed", async function () {
