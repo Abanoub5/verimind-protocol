@@ -1,30 +1,45 @@
 name: CI
 
 on:
-  push:
-    branches: ["main"]
-  pull_request:
-    branches: ["main"]
+push:
+branches: ["main"]
+pull_request:
+branches: ["main"]
 
 jobs:
-  test:
-    runs-on: ubuntu-latest
+test:
+runs-on: ubuntu-latest
 
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+steps:
+  - name: Checkout repository
+    uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: npm
+  - name: Setup Node.js
+    uses: actions/setup-node@v4
+    with:
+      node-version: 20
+      cache: npm
 
-      - name: Install dependencies
-        run: npm install
+  - name: Install dependencies
+    run: npm install
 
-      - name: Compile contracts
-        run: npm run compile
+  - name: Compile contracts
+    run: npm run compile
 
-      - name: Run tests
-        run: npm test
+  - name: Run Solidity tests
+    run: npm test
+
+  - name: Setup Python
+    uses: actions/setup-python@v5
+    with:
+      python-version: "3.13"
+
+  - name: Install Python dependencies
+    run: |
+      cd attribution-engine
+      pip install -r requirements.txt
+
+  - name: Run Attribution Engine tests
+    run: |
+      cd attribution-engine
+      pytest -q
