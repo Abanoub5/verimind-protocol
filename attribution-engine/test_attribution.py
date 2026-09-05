@@ -2,127 +2,152 @@ import math
 
 from attribution import Creator, cosine_similarity, top_k_attribution
 
+
 def test_cosine_similarity_identical_vectors():
-v = [1.0, 2.0, 3.0]
-assert math.isclose(cosine_similarity(v, v), 1.0, rel_tol=1e-9)
+    v = [1.0, 2.0, 3.0]
+    assert math.isclose(
+        cosine_similarity(v, v),
+        1.0,
+        rel_tol=1e-9,
+    )
+
 
 def test_cosine_similarity_orthogonal_vectors():
-assert math.isclose(
-cosine_similarity([1.0, 0.0], [0.0, 1.0]),
-0.0,
-abs_tol=1e-9,
-)
+    assert math.isclose(
+        cosine_similarity(
+            [1.0, 0.0],
+            [0.0, 1.0],
+        ),
+        0.0,
+        abs_tol=1e-9,
+    )
+
 
 def test_cosine_similarity_zero_vector_is_safe():
-assert cosine_similarity([0.0, 0.0], [1.0, 1.0]) == 0.0
+    assert cosine_similarity(
+        [0.0, 0.0],
+        [1.0, 1.0],
+    ) == 0.0
+
 
 def test_top_k_attribution_scores_sum_to_10000_bps():
-creators = [
-Creator("0xA", [0.9, 0.1, 0.0]),
-Creator("0xB", [0.1, 0.9, 0.0]),
-Creator("0xC", [0.0, 0.0, 1.0]),
-Creator("0xD", [0.5, 0.5, 0.0]),
-]
+    creators = [
+        Creator("0xA", [0.9, 0.1, 0.0]),
+        Creator("0xB", [0.1, 0.9, 0.0]),
+        Creator("0xC", [0.0, 0.0, 1.0]),
+        Creator("0xD", [0.5, 0.5, 0.0]),
+    ]
 
-result = top_k_attribution(
-    [1.0, 0.0, 0.0],
-    creators,
-    k=3,
-    tau=0.2,
-)
+    result = top_k_attribution(
+        [1.0, 0.0, 0.0],
+        creators,
+        k=3,
+        tau=0.2,
+    )
 
-total_bps = sum(bps for _, _, bps in result)
+    total_bps = sum(
+        bps for _, _, bps in result
+    )
 
-assert total_bps == 10_000
-assert len(result) == 3
+    assert total_bps == 10_000
+    assert len(result) == 3
+
 
 def test_top_k_attribution_orders_by_similarity_descending():
-creators = [
-Creator("0xLow", [0.0, 1.0]),
-Creator("0xHigh", [1.0, 0.0]),
-]
+    creators = [
+        Creator("0xLow", [0.0, 1.0]),
+        Creator("0xHigh", [1.0, 0.0]),
+    ]
 
-result = top_k_attribution(
-    [1.0, 0.0],
-    creators,
-    k=2,
-    tau=0.1,
-)
-
-assert result[0][0] == "0xHigh"
-assert result[0][1] > result[1][1]
-
-def test_top_k_attribution_respects_k():
-creators = [
-Creator(f"0x{i}", [float(i), 1.0])
-for i in range(10)
-]
-
-result = top_k_attribution(
-    [5.0, 1.0],
-    creators,
-    k=3,
-    tau=0.1,
-)
-
-assert len(result) == 3
-
-def test_top_k_attribution_empty_creators_returns_empty():
-assert top_k_attribution(
-[1.0, 0.0],
-[],
-k=3,
-) == []
-
-def test_top_k_attribution_rejects_non_positive_tau():
-creators = [
-Creator("0xA", [1.0, 0.0]),
-]
-
-for tau in (0.0, -0.1):
-    try:
-        top_k_attribution(
-            [1.0, 0.0],
-            creators,
-            k=1,
-            tau=tau,
-        )
-    except ValueError as exc:
-        assert str(exc) == "tau must be positive"
-    else:
-        raise AssertionError(
-            "Expected invalid tau to be rejected"
-        )
-
-def test_cosine_similarity_rejects_dimension_mismatch():
-try:
-cosine_similarity(
-[1.0, 0.0],
-[1.0, 0.0, 0.0],
-)
-except ValueError as exc:
-assert str(exc) == "embedding dimensions must match"
-else:
-raise AssertionError(
-"Expected dimension mismatch to be rejected"
-)
-
-def test_top_k_attribution_rejects_duplicate_creator_addresses():
-creators = [
-Creator("0xA", [1.0, 0.0]),
-Creator("0xA", [0.9, 0.1]),
-]
-
-try:
-    top_k_attribution(
+    result = top_k_attribution(
         [1.0, 0.0],
         creators,
         k=2,
         tau=0.1,
     )
-except ValueError as exc:
-    assert str(exc) == "duplicate creator address"
-else:
-    raise AssertionError(
-        "Expected duplicate creator address to be rejected"
+
+    assert result[0][0] == "0xHigh"
+    assert result[0][1] > result[1][1]
+
+
+def test_top_k_attribution_respects_k():
+    creators = [
+        Creator(
+            f"0x{i}",
+            [float(i), 1.0],
         )
+        for i in range(10)
+    ]
+
+    result = top_k_attribution(
+        [5.0, 1.0],
+        creators,
+        k=3,
+        tau=0.1,
+    )
+
+    assert len(result) == 3
+
+
+def test_top_k_attribution_empty_creators_returns_empty():
+    assert top_k_attribution(
+        [1.0, 0.0],
+        [],
+        k=3,
+    ) == []
+
+
+def test_top_k_attribution_rejects_non_positive_tau():
+    creators = [
+        Creator("0xA", [1.0, 0.0]),
+    ]
+
+    for tau in (0.0, -0.1):
+        try:
+            top_k_attribution(
+                [1.0, 0.0],
+                creators,
+                k=1,
+                tau=tau,
+            )
+        except ValueError as exc:
+            assert str(exc) == "tau must be positive"
+        else:
+            raise AssertionError(
+                "Expected invalid tau to be rejected"
+            )
+
+
+def test_cosine_similarity_rejects_dimension_mismatch():
+    try:
+        cosine_similarity(
+            [1.0, 0.0],
+            [1.0, 0.0, 0.0],
+        )
+    except ValueError as exc:
+        assert str(exc) == "embedding dimensions must match"
+    else:
+        raise AssertionError(
+            "Expected dimension mismatch to be rejected"
+        )
+
+
+def test_top_k_attribution_rejects_duplicate_creator_addresses():
+    creators = [
+        Creator("0xA", [1.0, 0.0]),
+        Creator("0xA", [0.9, 0.1]),
+    ]
+
+    try:
+        top_k_attribution(
+            [1.0, 0.0],
+            creators,
+            k=2,
+            tau=0.1,
+        )
+    except ValueError as exc:
+        assert str(exc) == "duplicate creator address"
+    else:
+        raise AssertionError(
+            "Expected duplicate creator address to be rejected"
+    )
